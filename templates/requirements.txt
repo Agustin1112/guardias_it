@@ -1,4 +1,0 @@
-Flask
-flask-login
-werkzeug
-gunicorn
