@@ -3,7 +3,13 @@ from flask import Flask, render_template, request, redirect, abort
 from flask_login import (
     LoginManager, login_user, logout_user,
     login_required, UserMixin, current_user
+    
 )
+import os
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "database.db")
+
 import sqlite3
 from datetime import datetime, timedelta
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -18,9 +24,10 @@ login_manager.login_view = "login"
 
 # ---------- DB ----------
 def get_db():
-    conn = sqlite3.connect("database.db")
+    conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
     return conn
+
 
 
 # ---------- USUARIOS ----------
@@ -88,81 +95,85 @@ from datetime import datetime, timedelta
 @login_required
 def index():
     db = get_db()
-    guardia_filtro = request.args.get("guardia")  # filtro opcional
+
+    # --- filtros ---
+    guardia_filtro = request.args.get("guardia")
+    estado_filtro = request.args.get("estado")
+    resueltos_filtro = request.args.get("resueltos")
+
     page = int(request.args.get("page", 1))
-    per_page = 10  # cantidad de registros por página
+    per_page = 10
 
-    # --- Selección de guardias según usuario ---
-    if current_user.es_admin:
-        if guardia_filtro:
-            query = """
-                SELECT *
-                FROM guardias
-                WHERE quien_guardia = ?
-                ORDER BY
-                    CASE prioridad
-                        WHEN 'Alta' THEN 1
-                        WHEN 'Media' THEN 2
-                        WHEN 'Baja' THEN 3
-                    END,
-                    fecha_llamado DESC
-            """
-            params = (guardia_filtro,)
-        else:
-            query = """
-                SELECT *
-                FROM guardias
-                ORDER BY
-                    CASE prioridad
-                        WHEN 'Alta' THEN 1
-                        WHEN 'Media' THEN 2
-                        WHEN 'Baja' THEN 3
-                    END,
-                    fecha_llamado DESC
-            """
-            params = ()
-        
-        # Traemos todos los guardias que existen en los llamados
-        guardias_disponibles = db.execute("""
-            SELECT DISTINCT quien_guardia
-            FROM guardias
-            ORDER BY quien_guardia
-        """).fetchall()
+    where = []
+    params = []
 
-    else:
-        query = """
-            SELECT *
-            FROM guardias
-            WHERE quien_guardia = ?
-            ORDER BY
-                CASE prioridad
-                    WHEN 'Alta' THEN 1
-                    WHEN 'Media' THEN 2
-                    WHEN 'Baja' THEN 3
-                END,
-                fecha_llamado DESC
-        """
-        params = (current_user.username,)
-        guardias_disponibles = []
+    # --- visibilidad según rol ---
+    if not current_user.es_admin:
+        where.append("quien_guardia = ?")
+        params.append(current_user.username)
 
-    # --- Traemos todos los guardias filtrados ---
+    # --- filtro guardia (solo admin) ---
+    if current_user.es_admin and guardia_filtro:
+        where.append("quien_guardia = ?")
+        params.append(guardia_filtro)
+
+    # --- filtro estado ---
+    if estado_filtro:
+        where.append("estado = ?")
+        params.append(estado_filtro)
+
+    # --- filtro resueltos ---
+    if resueltos_filtro == "hoy":
+        where.append("DATE(fecha_resolucion) = DATE('now')")
+    elif resueltos_filtro == "semana":
+        where.append("fecha_resolucion >= DATE('now','-7 day')")
+
+    where_sql = "WHERE " + " AND ".join(where) if where else ""
+
+    # --- traer TODOS los guardias filtrados ---
+    query = f"""
+        SELECT *
+        FROM guardias
+        {where_sql}
+        ORDER BY
+            CASE prioridad
+                WHEN 'Alta' THEN 1
+                WHEN 'Media' THEN 2
+                WHEN 'Baja' THEN 3
+            END,
+            fecha_llamado DESC
+    """
+
     guardias_all = db.execute(query, params).fetchall()
 
-    # --- Paginación ---
+    # --- paginación ---
     total = len(guardias_all)
     total_pages = (total + per_page - 1) // per_page
     start = (page - 1) * per_page
     end = start + per_page
     guardias_pag = guardias_all[start:end]
 
-    # --- Convertir a dict y marcar recientes ---
+    # --- marcar recientes ---
     now = datetime.now()
     guardias_pag_dict = []
     for g in guardias_pag:
         g_dict = dict(g)
-        fecha_registro = datetime.strptime(g_dict["fecha_registro"], "%Y-%m-%d %H:%M:%S.%f")
+        fecha_registro = datetime.strptime(
+            g_dict["fecha_registro"],
+            "%Y-%m-%d %H:%M:%S.%f"
+        )
         g_dict["recent"] = fecha_registro > now - timedelta(minutes=10)
         guardias_pag_dict.append(g_dict)
+
+    # --- lista de guardias para filtro (solo admin) ---
+    if current_user.es_admin:
+        guardias_disponibles = db.execute("""
+            SELECT DISTINCT quien_guardia
+            FROM guardias
+            ORDER BY quien_guardia
+        """).fetchall()
+    else:
+        guardias_disponibles = []
 
     return render_template(
         "index.html",
@@ -172,6 +183,7 @@ def index():
         page=page,
         total_pages=total_pages
     )
+
 
 
 
@@ -221,6 +233,8 @@ def nueva_guardia():
 
 
 
+from datetime import datetime
+
 @app.route("/editar/<int:id>", methods=["GET", "POST"])
 @login_required
 def editar_guardia(id):
@@ -239,7 +253,7 @@ def editar_guardia(id):
 
         fecha_resolucion = None
         if estado == "Resuelto":
-            fecha_resolucion = datetime.now()
+            fecha_resolucion = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         db.execute("""
             UPDATE guardias
@@ -262,6 +276,8 @@ def editar_guardia(id):
         return redirect("/")
 
     return render_template("editar_guardia.html", guardia=guardia)
+
+
 
 
 from werkzeug.security import generate_password_hash
@@ -511,6 +527,56 @@ def admin_usuarios():
         mensaje=mensaje
     )
 
+@app.route("/dashboard")
+@login_required
+def dashboard():
+    if not current_user.es_admin:
+        return redirect("/")
 
-if __name__ == "__main__":
-    app.run(debug=True)
+    db = get_db()
+
+    total = db.execute("SELECT COUNT(*) FROM guardias").fetchone()[0]
+
+    abiertos = db.execute("""
+        SELECT COUNT(*) FROM guardias WHERE estado = 'Abierto'
+    """).fetchone()[0]
+
+    en_progreso = db.execute("""
+        SELECT COUNT(*) FROM guardias WHERE estado = 'En progreso'
+    """).fetchone()[0]
+
+    resueltos_hoy = db.execute("""
+        SELECT COUNT(*) FROM guardias
+        WHERE estado = 'Resuelto'
+        AND date(fecha_resolucion) = date('now')
+    """).fetchone()[0]
+
+    top_guardias = db.execute("""
+        SELECT quien_guardia, COUNT(*) as total
+        FROM guardias
+        GROUP BY quien_guardia
+        ORDER BY total DESC
+        LIMIT 5
+    """).fetchall()
+
+    tiempo_promedio = db.execute("""
+        SELECT AVG(
+            (julianday(fecha_resolucion) - julianday(fecha_llamado)) * 24
+        )
+        FROM guardias
+        WHERE fecha_resolucion IS NOT NULL
+    """).fetchone()[0]
+
+    return render_template(
+        "dashboard.html",
+        total=total,
+        abiertos=abiertos,
+        en_progreso=en_progreso,
+        resueltos_hoy=resueltos_hoy,
+        top_guardias=top_guardias,
+        tiempo_promedio=round(tiempo_promedio, 2) if tiempo_promedio else None
+    )
+
+
+
+

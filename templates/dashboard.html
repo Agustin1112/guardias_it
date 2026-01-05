@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h3 class="mb-4">📊 Dashboard de Guardias</h3>
+
+<div class="row g-3 mb-4">
+
+    <div class="col-md-3">
+        <a href="/?estado=Abierto" class="text-decoration-none">
+            <div class="card text-bg-danger text-center shadow">
+                <div class="card-body">
+                    <h6>Abiertos</h6>
+                    <h2>{{ abiertos }}</h2>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-md-3">
+        <a href="/?estado=En progreso" class="text-decoration-none">
+            <div class="card text-bg-warning text-center shadow">
+                <div class="card-body">
+                    <h6>En progreso</h6>
+                    <h2>{{ en_progreso }}</h2>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-md-3">
+        <a href="/?resueltos=hoy" class="text-decoration-none">
+            <div class="card text-bg-success text-center shadow">
+                <div class="card-body">
+                    <h6>Resueltos hoy</h6>
+                    <h2>{{ resueltos_hoy }}</h2>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-md-3">
+        <a href="/?resueltos=semana" class="text-decoration-none">
+            <div class="card text-bg-primary text-center shadow">
+                <div class="card-body">
+                    <h6>Resueltos semana</h6>
+                    <h2>{{ resueltos_semana }}</h2>
+                </div>
+            </div>
+        </a>
+    </div>
+
+</div>
+
+<hr class="my-4">
+
+<h5>🏆 Top Guardias</h5>
+<table class="table table-striped">
+  <thead class="table-dark">
+    <tr>
+      <th>Guardia</th>
+      <th>Total llamados</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for g in top_guardias %}
+    <tr>
+      <td>{{ g.quien_guardia }}</td>
+      <td>{{ g.total }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<hr class="my-4">
+
+<div class="alert alert-info">
+  ⏱️ <strong>Tiempo promedio de resolución:</strong>
+  {{ tiempo_promedio }} minutos
+</div>
+
+{% endblock %}
