@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card p-4 shadow-sm">
+    <h3 class="mb-3">Editar usuario: {{ usuario.username }}</h3>
+
+    <form method="POST">
+        <div class="mb-3">
+            <label class="form-label">Nueva contraseña (opcional)</label>
+            <input type="password" name="password" class="form-control">
+        </div>
+
+        <div class="form-check mb-3">
+            <input class="form-check-input"
+                   type="checkbox"
+                   name="es_admin"
+                   id="es_admin"
+                   {% if usuario.es_admin %}checked{% endif %}>
+            <label class="form-check-label" for="es_admin">
+                Administrador
+            </label>
+        </div>
+
+        <button class="btn btn-success">Guardar cambios</button>
+        <a href="/usuarios" class="btn btn-secondary">Cancelar</a>
+    </form>
+</div>
+{% endblock %}

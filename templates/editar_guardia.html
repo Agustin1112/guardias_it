@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% set bloqueado = guardia.estado == "Cerrado" %}
+
+{% block content %}
+<h3>Editar llamado</h3>
+
+<form method="POST">
+
+    <div class="mb-2">
+        <label>Estado</label>
+        <select name="estado" class="form-control"
+            {% if bloqueado %}disabled{% endif %}>
+
+            <option value="Abierto"
+                {% if guardia.estado == "Abierto" %}selected{% endif %}>
+                Abierto
+            </option>
+
+            <option value="En progreso"
+                {% if guardia.estado == "En progreso" %}selected{% endif %}>
+                En progreso
+            </option>
+
+            <option value="Resuelto"
+                {% if guardia.estado == "Resuelto" %}selected{% endif %}>
+                Resuelto
+            </option>
+
+            <option value="Cerrado"
+                {% if guardia.estado == "Cerrado" %}selected{% endif %}>
+                Cerrado
+            </option>
+        </select>
+    </div>
+
+    <div class="mb-2">
+        <label>Resolución</label>
+        <textarea class="form-control" name="resolucion" rows="4"
+            {% if bloqueado %}readonly{% endif %}>
+{{ guardia.resolucion or "" }}
+        </textarea>
+    </div>
+
+    <div class="form-check mb-2">
+        <input class="form-check-input" type="checkbox" name="derivado"
+            {% if guardia.derivado %}checked{% endif %}
+            {% if bloqueado %}disabled{% endif %}>
+        <label class="form-check-label">Derivado</label>
+    </div>
+
+    <div class="mb-3">
+        <label>Derivado a</label>
+        <input class="form-control" name="derivado_a"
+               value="{{ guardia.derivado_a or '' }}"
+               {% if bloqueado %}readonly{% endif %}>
+    </div>
+
+    {% if not bloqueado %}
+        <button class="btn btn-success">Guardar cambios</button>
+    {% endif %}
+    <a href="/" class="btn btn-secondary">Volver</a>
+
+</form>
+{% endblock %}

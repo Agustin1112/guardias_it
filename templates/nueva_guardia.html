@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h3 class="mb-4">📞 Nuevo llamado</h3>
+
+<form method="POST" class="card p-4 shadow-sm">
+
+    <!-- Quién llamó -->
+    <div class="mb-3">
+        <label class="form-label">Quién llamó</label>
+        <input type="text"
+               name="quien_llamo"
+               class="form-control"
+               required>
+    </div>
+
+    <!-- Fecha del llamado -->
+    <div class="mb-3">
+        <label class="form-label">Fecha del llamado</label>
+        <input type="datetime-local"
+               name="fecha_llamado"
+               class="form-control"
+               required>
+    </div>
+
+    <!-- Descripción -->
+    <div class="mb-3">
+        <label class="form-label">Descripción del problema</label>
+        <textarea name="descripcion"
+                  class="form-control"
+                  rows="4"
+                  required></textarea>
+    </div>
+
+    <!-- Prioridad -->
+    <div class="mb-3">
+        <label class="form-label">Prioridad</label>
+        <select name="prioridad" class="form-select" required>
+            <option value="Baja">🟢 Baja</option>
+            <option value="Media" selected>🟡 Media</option>
+            <option value="Alta">🔴 Alta</option>
+        </select>
+    </div>
+
+    <!-- Estado -->
+    <div class="mb-3">
+        <label class="form-label">Estado del llamado</label>
+        <select name="estado" class="form-select" required>
+            <option value="Abierto" selected>🔴 Abierto</option>
+            <option value="En progreso">🟡 En progreso</option>
+            <option value="Resuelto">🟢 Resuelto</option>
+            <option value="Cerrado">⚫ Cerrado</option>
+        </select>
+    </div>
+
+    <!-- Derivado -->
+    <div class="form-check mb-3">
+        <input class="form-check-input"
+               type="checkbox"
+               id="derivado"
+               name="derivado"
+               onchange="toggleDerivado()">
+        <label class="form-check-label" for="derivado">
+            Fue derivado
+        </label>
+    </div>
+
+    <!-- Derivado a -->
+    <div class="mb-3" id="derivado_a_div" style="display:none;">
+        <label class="form-label">Derivado a</label>
+        <input type="text"
+               name="derivado_a"
+               class="form-control">
+    </div>
+
+    <button type="submit" class="btn btn-success">
+        💾 Guardar llamado
+    </button>
+</form>
+
+<script>
+function toggleDerivado() {
+    const checkbox = document.getElementById("derivado");
+    const div = document.getElementById("derivado_a_div");
+    div.style.display = checkbox.checked ? "block" : "none";
+}
+</script>
+
+{% endblock %}
