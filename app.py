@@ -192,33 +192,59 @@ def panel_usuarios():
     return render_template("usuarios.html", usuarios=usuarios)
 
 
-
 @app.route("/usuarios/nuevo", methods=["GET", "POST"])
 @login_required
 def nuevo_usuario():
+    # Solo admins pueden crear usuarios
     if not current_user.es_admin:
         abort(403)
 
     if request.method == "POST":
-        username = request.form["username"]
+        username = request.form["username"].strip()
         password = request.form["password"]
         es_admin = "es_admin" in request.form
+
+        if not username or not password:
+            flash("Usuario y contraseña son obligatorios", "danger")
+            return render_template("nuevo_usuario.html")
 
         password_hash = generate_password_hash(password)
 
         db = get_db()
         cur = db.cursor()
 
-        cur.execute("""
-            INSERT INTO usuarios (username, password_hash, es_admin, activo)
-            VALUES (%s, %s, %s, true)
-        """, (username, password_hash, es_admin))
+        try:
+            cur.execute("""
+                INSERT INTO usuarios (
+                    username,
+                    password,
+                    password_hash,
+                    es_admin,
+                    activo,
+                    debe_cambiar_password
+                )
+                VALUES (%s, %s, %s, %s, true, true)
+            """, (
+                username,
+                "TEMP",  # placeholder, no se usa
+                password_hash,
+                es_admin
+            ))
 
-        db.commit()
-        flash("Usuario creado correctamente", "success")
-        return redirect(url_for("panel_usuarios"))
+            db.commit()
+            flash("Usuario creado correctamente", "success")
+            return redirect(url_for("panel_usuarios"))
+
+        except Exception as e:
+            db.rollback()
+            flash("Error al crear el usuario (¿usuario duplicado?)", "danger")
+
+        finally:
+            cur.close()
 
     return render_template("nuevo_usuario.html")
+
+
 
 
 # ---------- EDITAR USUARIO ----------
@@ -466,3 +492,6 @@ def dashboard():
         top_guardias=top_guardias,
         tiempo_promedio=round(tiempo_promedio, 2) if tiempo_promedio else None
     )
+
+if __name__ == "__main__":
+    app.run(debug=True)
