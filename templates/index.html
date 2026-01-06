@@ -53,7 +53,7 @@
     <tbody>
         {% for g in guardias %}
         <tr {% if g.recent %}style="background-color: #eafaf1;"{% endif %}>
-            <td>{{ g.fecha_llamado[:16] }}</td>
+            <td>{{ g.fecha_llamado.strftime('%d/%m/%Y %H:%M') }}</td>
             <td>{{ g.fecha_registro[:16] }}</td>
             <td>{{ g.quien_llamo }}</td>
             <td>{{ g.quien_guardia }}</td>
