@@ -1,5 +1,5 @@
 from math import ceil
-from flask import Flask, render_template, request, redirect, abort
+from flask import Flask, flash, render_template, request, redirect, abort, url_for
 from flask_login import (
     LoginManager, login_user, logout_user,
     login_required, UserMixin, current_user
@@ -197,68 +197,60 @@ def panel_usuarios():
 @login_required
 def nuevo_usuario():
     if not current_user.es_admin:
-        return redirect("/")
+        abort(403)
 
     if request.method == "POST":
         username = request.form["username"]
-        password = generate_password_hash(request.form["password"])
-        es_admin = 1 if request.form.get("es_admin") else 0
+        password = request.form["password"]
+        es_admin = "es_admin" in request.form
+
+        password_hash = generate_password_hash(password)
 
         db = get_db()
-        db.execute(
-            "INSERT INTO usuarios (username, password, es_admin) VALUES (?, ?, ?)",
-            (username, password, es_admin)
-        )
+        cur = db.cursor()
+
+        cur.execute("""
+            INSERT INTO usuarios (username, password_hash, es_admin, activo)
+            VALUES (%s, %s, %s, true)
+        """, (username, password_hash, es_admin))
+
         db.commit()
-        return redirect("/usuarios")
+        flash("Usuario creado correctamente", "success")
+        return redirect(url_for("panel_usuarios"))
 
     return render_template("nuevo_usuario.html")
 
+
 # ---------- EDITAR USUARIO ----------
-@app.route("/usuarios/editar/<username>", methods=["GET", "POST"])
+@app.route("/usuarios/editar/<int:user_id>", methods=["GET", "POST"])
 @login_required
-def editar_usuario(username):
+def editar_usuario(user_id):
     if not current_user.es_admin:
         abort(403)
 
     db = get_db()
-    usuario = db.execute(
-        "SELECT * FROM usuarios WHERE username = ?",
-        (username,)
-    ).fetchone()
-
-    if not usuario:
-        abort(404)
+    cur = db.cursor()
 
     if request.method == "POST":
-        es_admin = 1 if request.form.get("es_admin") else 0
-        nueva_password = request.form.get("password")
+        es_admin = "es_admin" in request.form
+        activo = "activo" in request.form
 
-        # Si cambia password
-        if nueva_password:
-            db.execute("""
-                UPDATE usuarios
-                SET password = ?, es_admin = ?
-                WHERE username = ?
-            """, (
-                generate_password_hash(nueva_password),
-                es_admin,
-                username
-            ))
-        else:
-            db.execute("""
-                UPDATE usuarios
-                SET es_admin = ?
-                WHERE username = ?
-            """, (
-                es_admin,
-                username
-            ))
+        cur.execute("""
+            UPDATE usuarios
+            SET es_admin = %s,
+                activo = %s
+            WHERE id = %s
+        """, (es_admin, activo, user_id))
 
         db.commit()
-        return redirect("/usuarios")
+        flash("Usuario actualizado", "success")
+        return redirect(url_for("panel_usuarios"))
+
+    cur.execute("SELECT id, username, es_admin, activo FROM usuarios WHERE id = %s", (user_id,))
+    usuario = cur.fetchone()
 
     return render_template("editar_usuario.html", usuario=usuario)
+
 
 
 # ---------- ELIMINAR USUARIO ----------
@@ -338,6 +330,48 @@ def activar_usuario(username):
     )
     db.commit()
     return redirect("/usuarios")
+
+@app.route("/usuarios/toggle/<int:user_id>", methods=["POST"])
+@login_required
+def toggle_usuario(user_id):
+    if not current_user.es_admin:
+        abort(403)
+
+    db = get_db()
+    cur = db.cursor()
+
+    cur.execute("""
+        UPDATE usuarios
+        SET activo = NOT activo
+        WHERE id = %s
+    """, (user_id,))
+
+    db.commit()
+    return redirect(url_for("panel_usuarios"))
+
+@app.route("/usuarios/reset_password/<int:user_id>", methods=["POST"])
+@login_required
+def reset_password(user_id):
+    if not current_user.es_admin:
+        abort(403)
+
+    nueva_password = "1234"  # o generada
+    password_hash = generate_password_hash(nueva_password)
+
+    db = get_db()
+    cur = db.cursor()
+
+    cur.execute("""
+        UPDATE usuarios
+        SET password_hash = %s
+        WHERE id = %s
+    """, (password_hash, user_id))
+
+    db.commit()
+    flash("Contraseña reseteada a 1234", "warning")
+    return redirect(url_for("panel_usuarios"))
+
+
 
 # ================== NUEVA GUARDIA ==================
 @app.route("/nueva", methods=["GET", "POST"])
