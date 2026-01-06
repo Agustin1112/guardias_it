@@ -194,7 +194,12 @@ def index():
 
     guardias = cur.fetchall()
 
-    return render_template("index.html", guardias=guardias)
+    return render_template(
+        "index.html",
+        guardias=guardias,
+        total_pages=1   # 👈 CLAVE
+    )
+
 
 # --------------------------------------------------
 # DASHBOARD
