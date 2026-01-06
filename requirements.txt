@@ -2,4 +2,3 @@ Flask
 flask-login
 werkzeug
 gunicorn
-guardias-db
