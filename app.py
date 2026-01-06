@@ -277,7 +277,7 @@ def editar_usuario(user_id):
 
     return render_template("editar_usuario.html", usuario=usuario)
 
-@app.route("/usuarios/<int:user_id>/toggle", methods=["POST"])
+@app.route("/usuarios/toggle/<int:user_id>", methods=["POST"])
 @login_required
 def toggle_usuario(user_id):
     if not current_user.es_admin:
@@ -286,17 +286,17 @@ def toggle_usuario(user_id):
     db = get_db()
     cur = db.cursor()
 
-    cur.execute("""
-        UPDATE usuarios
-        SET activo = NOT activo
-        WHERE id = %s
-    """, (user_id,))
+    cur.execute(
+        "UPDATE usuarios SET activo = NOT activo WHERE id = %s",
+        (user_id,)
+    )
 
     db.commit()
     cur.close()
 
     flash("Estado del usuario actualizado", "success")
     return redirect(url_for("panel_usuarios"))
+
 
 @app.route("/usuarios/<int:user_id>/toggle-admin", methods=["POST"])
 @login_required
@@ -323,7 +323,6 @@ def toggle_admin(user_id):
 
     flash("Rol del usuario actualizado", "success")
     return redirect(url_for("panel_usuarios"))
-
 
 
 # ---------- ELIMINAR USUARIO ----------
