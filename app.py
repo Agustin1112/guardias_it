@@ -176,12 +176,21 @@ def index():
 @login_required
 def panel_usuarios():
     if not current_user.es_admin:
-        return redirect("/")
+        abort(403)
 
     db = get_db()
-    usuarios = db.execute("SELECT * FROM usuarios ORDER BY username").fetchall()
-    mensaje = None  # para mostrar alertas si querés después
-    return render_template("admin_usuarios.html", usuarios=usuarios, mensaje=mensaje)
+    cur = db.cursor()
+
+    cur.execute("""
+        SELECT id, username, es_admin
+        FROM usuarios
+        ORDER BY username
+    """)
+
+    usuarios = cur.fetchall()
+
+    return render_template("usuarios.html", usuarios=usuarios)
+
 
 
 @app.route("/usuarios/nuevo", methods=["GET", "POST"])
