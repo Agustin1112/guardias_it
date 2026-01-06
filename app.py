@@ -171,6 +171,165 @@ def index():
         total_pages=total_pages
     )
 
+# ---------- PANEL DE USUARIOS (SOLO ADMIN) ----------
+@app.route("/usuarios")
+@login_required
+def panel_usuarios():
+    if not current_user.es_admin:
+        return redirect("/")
+
+    db = get_db()
+    usuarios = db.execute("SELECT * FROM usuarios ORDER BY username").fetchall()
+    mensaje = None  # para mostrar alertas si querés después
+    return render_template("admin_usuarios.html", usuarios=usuarios, mensaje=mensaje)
+
+
+@app.route("/usuarios/nuevo", methods=["GET", "POST"])
+@login_required
+def nuevo_usuario():
+    if not current_user.es_admin:
+        return redirect("/")
+
+    if request.method == "POST":
+        username = request.form["username"]
+        password = generate_password_hash(request.form["password"])
+        es_admin = 1 if request.form.get("es_admin") else 0
+
+        db = get_db()
+        db.execute(
+            "INSERT INTO usuarios (username, password, es_admin) VALUES (?, ?, ?)",
+            (username, password, es_admin)
+        )
+        db.commit()
+        return redirect("/usuarios")
+
+    return render_template("nuevo_usuario.html")
+
+# ---------- EDITAR USUARIO ----------
+@app.route("/usuarios/editar/<username>", methods=["GET", "POST"])
+@login_required
+def editar_usuario(username):
+    if not current_user.es_admin:
+        abort(403)
+
+    db = get_db()
+    usuario = db.execute(
+        "SELECT * FROM usuarios WHERE username = ?",
+        (username,)
+    ).fetchone()
+
+    if not usuario:
+        abort(404)
+
+    if request.method == "POST":
+        es_admin = 1 if request.form.get("es_admin") else 0
+        nueva_password = request.form.get("password")
+
+        # Si cambia password
+        if nueva_password:
+            db.execute("""
+                UPDATE usuarios
+                SET password = ?, es_admin = ?
+                WHERE username = ?
+            """, (
+                generate_password_hash(nueva_password),
+                es_admin,
+                username
+            ))
+        else:
+            db.execute("""
+                UPDATE usuarios
+                SET es_admin = ?
+                WHERE username = ?
+            """, (
+                es_admin,
+                username
+            ))
+
+        db.commit()
+        return redirect("/usuarios")
+
+    return render_template("editar_usuario.html", usuario=usuario)
+
+
+# ---------- ELIMINAR USUARIO ----------
+@app.route("/usuarios/eliminar/<username>", methods=["POST"])
+@login_required
+def eliminar_usuario(username):
+    if not current_user.es_admin:
+        abort(403)
+
+    if username == current_user.username:
+        return redirect("/usuarios")
+
+    db = get_db()
+
+    # No borrar último admin
+    admins = db.execute(
+        "SELECT COUNT(*) FROM usuarios WHERE es_admin = 1"
+    ).fetchone()[0]
+
+    usuario = db.execute(
+        "SELECT * FROM usuarios WHERE username = ?",
+        (username,)
+    ).fetchone()
+
+    if usuario["es_admin"] and admins <= 1:
+        return redirect("/usuarios")
+
+    db.execute(
+        "DELETE FROM usuarios WHERE username = ?",
+        (username,)
+    )
+    db.commit()
+
+    return redirect("/usuarios")
+
+@app.route("/usuarios/desactivar/<username>", methods=["POST"])
+@login_required
+def desactivar_usuario(username):
+    if not current_user.es_admin:
+        abort(403)
+
+    if username == current_user.username:
+        return redirect("/usuarios")
+
+    db = get_db()
+
+    # evitar desactivar último admin
+    admins = db.execute(
+        "SELECT COUNT(*) FROM usuarios WHERE es_admin = 1 AND activo = 1"
+    ).fetchone()[0]
+
+    usuario = db.execute(
+        "SELECT * FROM usuarios WHERE username = ?",
+        (username,)
+    ).fetchone()
+
+    if usuario["es_admin"] and admins <= 1:
+        return redirect("/usuarios")
+
+    db.execute(
+        "UPDATE usuarios SET activo = 0 WHERE username = ?",
+        (username,)
+    )
+    db.commit()
+    return redirect("/usuarios")
+
+@app.route("/usuarios/activar/<username>", methods=["POST"])
+@login_required
+def activar_usuario(username):
+    if not current_user.es_admin:
+        abort(403)
+
+    db = get_db()
+    db.execute(
+        "UPDATE usuarios SET activo = 1 WHERE username = ?",
+        (username,)
+    )
+    db.commit()
+    return redirect("/usuarios")
+
 # ================== NUEVA GUARDIA ==================
 @app.route("/nueva", methods=["GET", "POST"])
 @login_required
