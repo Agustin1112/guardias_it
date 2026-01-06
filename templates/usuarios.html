@@ -9,54 +9,81 @@
     <thead class="table-dark">
         <tr>
             <th>Username</th>
-            <th>Rol</th>
-            <th>Estado</th>
+            <th>Admin</th>
+            <th>Activo</th>
             <th>Acciones</th>
         </tr>
     </thead>
     <tbody>
         {% for u in usuarios %}
-        <tr>
+        <tr id="user-{{ u.id }}">
             <td>{{ u.username }}</td>
-
-            <!-- Rol -->
             <td>
-                {% if u.es_admin %}
-                    <span class="badge bg-warning text-dark">Admin</span>
-                {% else %}
-                    <span class="badge bg-secondary">Usuario</span>
-                {% endif %}
+                <span class="badge {% if u.es_admin %}bg-warning text-dark{% else %}bg-secondary{% endif %}" id="admin-badge-{{ u.id }}">
+                    {% if u.es_admin %}Admin{% else %}Usuario{% endif %}
+                </span>
             </td>
-
-            <!-- Estado -->
             <td>
-                {% if u.activo %}
-                    <span class="badge bg-success">Activo</span>
-                {% else %}
-                    <span class="badge bg-danger">Inactivo</span>
-                {% endif %}
+                <span class="badge {% if u.activo %}bg-success{% else %}bg-danger{% endif %}" id="activo-badge-{{ u.id }}">
+                    {% if u.activo %}Activo{% else %}Inactivo{% endif %}
+                </span>
             </td>
-
-            <!-- Acciones -->
-            <td class="d-flex gap-2">
-
-                <!-- Activar / Desactivar -->
-                <form method="POST" action="{{ url_for('toggle_usuario', user_id=u.id) }}">
-                    <button class="btn btn-sm btn-outline-primary">
-                        {% if u.activo %}Desactivar{% else %}Activar{% endif %}
-                    </button>
-                </form>
-
-                <!-- Admin / Usuario -->
-                <form method="POST" action="{{ url_for('toggle_admin', user_id=u.id) }}">
-                    <button class="btn btn-sm btn-outline-warning">
-                        {% if u.es_admin %}Quitar admin{% else %}Hacer admin{% endif %}
-                    </button>
-                </form>
-
+            <td>
+                <button class="btn btn-sm btn-primary" onclick="toggleAdmin({{ u.id }})">
+                    Cambiar rol
+                </button>
+                <button class="btn btn-sm btn-warning" onclick="toggleActivo({{ u.id }})">
+                    Activar/Desactivar
+                </button>
+                <a href="{{ url_for('editar_usuario', user_id=u.id) }}" class="btn btn-sm btn-secondary">
+                    Editar
+                </a>
             </td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
+
+<script>
+async function toggleAdmin(userId) {
+    const response = await fetch(`/usuarios/${userId}/toggle-admin`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
+    });
+
+    if (response.ok) {
+        const badge = document.getElementById(`admin-badge-${userId}`);
+        if (badge.textContent.trim() === 'Admin') {
+            badge.textContent = 'Usuario';
+            badge.className = 'badge bg-secondary';
+        } else {
+            badge.textContent = 'Admin';
+            badge.className = 'badge bg-warning text-dark';
+        }
+    } else {
+        alert('Error al cambiar el rol del usuario');
+    }
+}
+
+async function toggleActivo(userId) {
+    const response = await fetch(`/usuarios/toggle/${userId}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
+    });
+
+    if (response.ok) {
+        const badge = document.getElementById(`activo-badge-${userId}`);
+        if (badge.textContent.trim() === 'Activo') {
+            badge.textContent = 'Inactivo';
+            badge.className = 'badge bg-danger';
+        } else {
+            badge.textContent = 'Activo';
+            badge.className = 'badge bg-success';
+        }
+    } else {
+        alert('Error al cambiar el estado del usuario');
+    }
+}
+</script>
+
 {% endblock %}

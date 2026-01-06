@@ -1,28 +1,26 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="card p-4 shadow-sm">
-    <h3 class="mb-3">Editar usuario: {{ usuario.username }}</h3>
+<h3 class="mb-3">Editar Usuario: {{ usuario[1] }}</h3>
 
-    <form method="POST">
-        <div class="mb-3">
-            <label class="form-label">Nueva contraseña (opcional)</label>
-            <input type="password" name="password" class="form-control">
-        </div>
+<form method="POST">
+    <div class="form-check mb-2">
+        <input class="form-check-input" type="checkbox" value="1" id="es_admin" name="es_admin"
+            {% if usuario[2] %} checked {% endif %}>
+        <label class="form-check-label" for="es_admin">
+            Administrador
+        </label>
+    </div>
 
-        <div class="form-check mb-3">
-            <input class="form-check-input"
-                   type="checkbox"
-                   name="es_admin"
-                   id="es_admin"
-                   {% if usuario.es_admin %}checked{% endif %}>
-            <label class="form-check-label" for="es_admin">
-                Administrador
-            </label>
-        </div>
+    <div class="form-check mb-3">
+        <input class="form-check-input" type="checkbox" value="1" id="activo" name="activo"
+            {% if usuario[3] %} checked {% endif %}>
+        <label class="form-check-label" for="activo">
+            Usuario activo
+        </label>
+    </div>
 
-        <button class="btn btn-success">Guardar cambios</button>
-        <a href="/usuarios" class="btn btn-secondary">Cancelar</a>
-    </form>
-</div>
+    <button type="submit" class="btn btn-success">Guardar cambios</button>
+    <a href="{{ url_for('panel_usuarios') }}" class="btn btn-secondary">Cancelar</a>
+</form>
 {% endblock %}

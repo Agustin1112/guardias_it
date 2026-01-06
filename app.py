@@ -1,5 +1,5 @@
 from math import ceil
-from flask import Flask, flash, render_template, request, redirect, abort, url_for
+from flask import Flask, flash, jsonify, render_template, request, redirect, abort, url_for
 from flask_login import (
     LoginManager, login_user, logout_user,
     login_required, UserMixin, current_user
@@ -269,60 +269,56 @@ def editar_usuario(user_id):
         """, (es_admin, activo, user_id))
 
         db.commit()
+        cur.close()
         flash("Usuario actualizado", "success")
         return redirect(url_for("panel_usuarios"))
 
     cur.execute("SELECT id, username, es_admin, activo FROM usuarios WHERE id = %s", (user_id,))
     usuario = cur.fetchone()
+    cur.close()
 
     return render_template("editar_usuario.html", usuario=usuario)
+
 
 @app.route("/usuarios/toggle/<int:user_id>", methods=["POST"])
 @login_required
 def toggle_usuario(user_id):
     if not current_user.es_admin:
-        abort(403)
+        return jsonify({"error": "No autorizado"}), 403
 
-    db = get_db()
-    cur = db.cursor()
-
-    cur.execute(
-        "UPDATE usuarios SET activo = NOT activo WHERE id = %s",
-        (user_id,)
-    )
-
-    db.commit()
-    cur.close()
-
-    flash("Estado del usuario actualizado", "success")
-    return redirect(url_for("panel_usuarios"))
+    try:
+        db = get_db()
+        cur = db.cursor()
+        cur.execute("UPDATE usuarios SET activo = NOT activo WHERE id = %s", (user_id,))
+        db.commit()
+        cur.close()
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": str(e)}), 400
 
 
 @app.route("/usuarios/<int:user_id>/toggle-admin", methods=["POST"])
 @login_required
 def toggle_admin(user_id):
     if not current_user.es_admin:
-        abort(403)
+        return jsonify({"error": "No autorizado"}), 403
 
-    # Evitar que se quite admin a sí mismo
+    # Evitar que el admin se quite a sí mismo
     if current_user.id == user_id:
-        flash("No podés cambiar tu propio rol", "warning")
-        return redirect(url_for("panel_usuarios"))
+        return jsonify({"error": "No podés cambiar tu propio rol"}), 400
 
-    db = get_db()
-    cur = db.cursor()
+    try:
+        db = get_db()
+        cur = db.cursor()
+        cur.execute("UPDATE usuarios SET es_admin = NOT es_admin WHERE id = %s", (user_id,))
+        db.commit()
+        cur.close()
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": str(e)}), 400
 
-    cur.execute("""
-        UPDATE usuarios
-        SET es_admin = NOT es_admin
-        WHERE id = %s
-    """, (user_id,))
-
-    db.commit()
-    cur.close()
-
-    flash("Rol del usuario actualizado", "success")
-    return redirect(url_for("panel_usuarios"))
 
 
 # ---------- ELIMINAR USUARIO ----------
