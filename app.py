@@ -404,23 +404,7 @@ def activar_usuario(username):
     db.commit()
     return redirect("/usuarios")
 
-@app.route("/usuarios/toggle/<int:user_id>", methods=["POST"])
-@login_required
-def toggle_usuario(user_id):
-    if not current_user.es_admin:
-        abort(403)
 
-    db = get_db()
-    cur = db.cursor()
-
-    cur.execute("""
-        UPDATE usuarios
-        SET activo = NOT activo
-        WHERE id = %s
-    """, (user_id,))
-
-    db.commit()
-    return redirect(url_for("panel_usuarios"))
 
 @app.route("/usuarios/reset_password/<int:user_id>", methods=["POST"])
 @login_required
