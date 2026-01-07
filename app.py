@@ -467,6 +467,37 @@ def nueva_guardia():
 
     return render_template("nueva_guardia.html")
 
+@app.route("/guardias/editar/<int:guardia_id>", methods=["GET", "POST"])
+@login_required
+def editar_guardia(guardia_id):
+    db = get_db()
+    cur = db.cursor()
+
+    if request.method == "POST":
+        cur.execute("""
+            UPDATE guardias
+            SET descripcion = %s,
+                estado = %s,
+                prioridad = %s
+            WHERE id = %s
+        """, (
+            request.form["descripcion"],
+            request.form["estado"],
+            request.form["prioridad"],
+            guardia_id
+        ))
+        db.commit()
+        cur.close()
+        flash("Guardia actualizada", "success")
+        return redirect(url_for("index"))
+
+    cur.execute("SELECT * FROM guardias WHERE id = %s", (guardia_id,))
+    guardia = cur.fetchone()
+    cur.close()
+
+    return render_template("editar_guardia.html", guardia=guardia)
+
+
 # ================== DASHBOARD ==================
 @app.route("/dashboard")
 @login_required

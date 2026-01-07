@@ -96,9 +96,11 @@
 
             <!-- ACCIONES -->
             <td>
-                <a href="/editar/{{ g.id }}" class="btn btn-sm btn-primary">
-                    ✏️ Editar
-                </a>
+                <a href="{{ url_for('editar_guardia', guardia_id=g.id) }}"
+   class="btn btn-sm btn-primary">
+   ✏️ Editar
+</a>
+
             </td>
         </tr>
         {% endfor %}
