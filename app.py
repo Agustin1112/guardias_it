@@ -59,36 +59,50 @@ def load_user(user_id):
     return None
 
 # ================== LOGIN ==================
+from flask import render_template, request, redirect, flash
+from flask_login import login_user, logout_user, login_required
+from werkzeug.security import check_password_hash
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+
         db = get_db()
         cur = db.cursor()
-        cur.execute(
-            "SELECT * FROM usuarios WHERE username = %s AND activo = 1",
-            (request.form["username"],)
-        )
-        user = cur.fetchone()
-        db.close()
 
-        if user and check_password_hash(user["password"], request.form["password"]):
+        cur.execute("""
+            SELECT id, username, password_hash, es_admin
+            FROM usuarios
+            WHERE username = %s AND activo = true
+        """, (username,))
+
+        user = cur.fetchone()
+        cur.close()
+
+        if user and check_password_hash(user[2], password):
             login_user(
                 User(
-                    user["id"],
-                    user["username"],
-                    user["password"],
-                    user["es_admin"]
+                    user[0],  # id
+                    user[1],  # username
+                    user[2],  # password_hash
+                    user[3]   # es_admin
                 )
             )
             return redirect("/")
 
+        flash("Usuario o contraseña incorrectos", "danger")
+
     return render_template("login.html")
+
 
 @app.route("/logout")
 @login_required
 def logout():
     logout_user()
     return redirect("/login")
+
 
 # ================== INDEX ==================
 @app.route("/")
