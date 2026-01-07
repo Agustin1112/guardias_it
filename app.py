@@ -182,14 +182,18 @@ def panel_usuarios():
     cur = db.cursor()
 
     cur.execute("""
-        SELECT id, username, es_admin
+        SELECT id, username, es_admin, activo
         FROM usuarios
         ORDER BY username
     """)
 
     usuarios = cur.fetchall()
 
+    cur.close()
+    db.close()
+
     return render_template("usuarios.html", usuarios=usuarios)
+
 
 
 @app.route("/usuarios/nuevo", methods=["GET", "POST"])
