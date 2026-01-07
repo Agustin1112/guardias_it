@@ -80,6 +80,7 @@ def login():
 
         user = cur.fetchone()
         cur.close()
+        db.close()
 
         if user and check_password_hash(user["password_hash"], password):
             login_user(
@@ -95,6 +96,7 @@ def login():
         flash("Usuario o contraseña incorrectos", "danger")
 
     return render_template("login.html")
+
 
 
 
