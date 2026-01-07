@@ -81,13 +81,13 @@ def login():
         user = cur.fetchone()
         cur.close()
 
-        if user and check_password_hash(user[2], password):
+        if user and check_password_hash(user["password_hash"], password):
             login_user(
                 User(
-                    user[0],  # id
-                    user[1],  # username
-                    user[2],  # password_hash
-                    user[3]   # es_admin
+                    user["id"],
+                    user["username"],
+                    user["password_hash"],
+                    user["es_admin"]
                 )
             )
             return redirect("/")
@@ -95,6 +95,7 @@ def login():
         flash("Usuario o contraseña incorrectos", "danger")
 
     return render_template("login.html")
+
 
 
 @app.route("/logout")
