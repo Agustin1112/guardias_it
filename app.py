@@ -629,6 +629,7 @@ def historial_guardias():
 
 
 # ================== DASHBOARD ==================
+# ================== DASHBOARD ==================
 @app.route("/dashboard")
 @login_required
 def dashboard():
@@ -638,41 +639,65 @@ def dashboard():
     db = get_db()
     cur = db.cursor()
 
+    # TOTAL LLAMADOS
     cur.execute("SELECT COUNT(*) FROM guardias")
     total = cur.fetchone()["count"]
 
-    cur.execute("SELECT COUNT(*) FROM guardias WHERE estado = 'Abierto'")
+    # ABIERTOS
+    cur.execute("""
+        SELECT COUNT(*) FROM guardias
+        WHERE estado = 'Abierto'
+    """)
     abiertos = cur.fetchone()["count"]
 
-    cur.execute("SELECT COUNT(*) FROM guardias WHERE estado = 'En progreso'")
+    # EN PROGRESO
+    cur.execute("""
+        SELECT COUNT(*) FROM guardias
+        WHERE estado = 'En progreso'
+    """)
     en_progreso = cur.fetchone()["count"]
 
+    # RESUELTOS HOY (estado + fecha)
     cur.execute("""
         SELECT COUNT(*) FROM guardias
         WHERE estado = 'Resuelto'
+        AND fecha_resolucion IS NOT NULL
         AND DATE(fecha_resolucion) = CURRENT_DATE
     """)
     resueltos_hoy = cur.fetchone()["count"]
 
+    # RESUELTOS ESTA SEMANA
+    cur.execute("""
+        SELECT COUNT(*) FROM guardias
+        WHERE estado = 'Resuelto'
+        AND fecha_resolucion IS NOT NULL
+        AND fecha_resolucion >= date_trunc('week', CURRENT_DATE)
+    """)
+    resueltos_semana = cur.fetchone()["count"]
+
+    # TOP GUARDIAS (solo resueltos)
     cur.execute("""
         SELECT quien_guardia, COUNT(*) AS total
         FROM guardias
+        WHERE estado = 'Resuelto'
         GROUP BY quien_guardia
         ORDER BY total DESC
         LIMIT 5
     """)
     top_guardias = cur.fetchall()
 
+    # TIEMPO PROMEDIO DE RESOLUCIÓN (minutos)
     cur.execute("""
         SELECT AVG(
-            EXTRACT(EPOCH FROM (fecha_resolucion - fecha_llamado)) / 3600
-        )
+            EXTRACT(EPOCH FROM (fecha_resolucion - fecha_llamado)) / 60
+        ) AS promedio
         FROM guardias
-        WHERE fecha_resolucion IS NOT NULL
+        WHERE estado = 'Resuelto'
+        AND fecha_resolucion IS NOT NULL
     """)
-    tiempo_promedio = cur.fetchone()["avg"]
+    tiempo_promedio = cur.fetchone()["promedio"]
 
-    db.close()
+    cur.close()
 
     return render_template(
         "dashboard.html",
@@ -680,9 +705,48 @@ def dashboard():
         abiertos=abiertos,
         en_progreso=en_progreso,
         resueltos_hoy=resueltos_hoy,
+        resueltos_semana=resueltos_semana,
         top_guardias=top_guardias,
-        tiempo_promedio=round(tiempo_promedio, 2) if tiempo_promedio else None
+        tiempo_promedio=round(tiempo_promedio, 1) if tiempo_promedio else "—"
     )
+
+
+@app.route("/resolver_guardia/<int:id>", methods=["POST"])
+@login_required
+def resolver_guardia(id):
+    db = get_db()
+    cur = db.cursor()
+
+    # Solo admin o el guardia asignado pueden resolver
+    cur.execute("""
+        SELECT quien_guardia
+        FROM guardias
+        WHERE id = %s
+    """, (id,))
+    guardia = cur.fetchone()
+
+    if not guardia:
+        cur.close()
+        return redirect("/historial_guardias")
+
+    if not current_user.es_admin and guardia["quien_guardia"] != current_user.username:
+        cur.close()
+        return redirect("/historial_guardias")
+
+    # Marcar como resuelto + fecha
+    cur.execute("""
+        UPDATE guardias
+        SET estado = 'Resuelto',
+            fecha_resolucion = NOW()
+        WHERE id = %s
+    """, (id,))
+
+    db.commit()
+    cur.close()
+
+    return redirect("/historial_guardias")
+
+
 
 if __name__ == "__main__":
     app.run(debug=True)
