@@ -537,7 +537,7 @@ def historial_guardias():
     cur = db.cursor()
 
     # ===============================
-    # GUARDIAS DISPONIBLES (SOLO ADMIN)
+    # GUARDIAS DISPONIBLES (ADMIN)
     # ===============================
     guardias_disponibles = []
     if current_user.es_admin:
@@ -549,61 +549,68 @@ def historial_guardias():
         guardias_disponibles = cur.fetchall()
 
     # ===============================
-    # FILTROS
-    # ===============================
-    filtros = []
-    params = []
-
-    if not current_user.es_admin:
-        filtros.append("quien_guardia = %s")
-        params.append(current_user.username)
-
-    if guardia_filtro:
-        filtros.append("quien_guardia = %s")
-        params.append(guardia_filtro)
-
-    where = f"WHERE {' AND '.join(filtros)}" if filtros else ""
-
-    # ===============================
-    # TOTAL
-    # ===============================
-    cur.execute(f"""
-        SELECT COUNT(*)
-        FROM guardias
-        {where}
-    """, params)
-    total = cur.fetchone()[0]
-
-    # ===============================
-    # PAGINACIÓN
+    # ADMIN (paginación SIEMPRE)
     # ===============================
     if current_user.es_admin:
-        total_pages = math.ceil(total / per_page) if total > 0 else 1
-        limit_sql = "LIMIT %s OFFSET %s"
-        params_query = params + [per_page, offset]
-    else:
-        if total <= 10:
-            total_pages = 1
-            limit_sql = ""
-            params_query = params
-        else:
-            total_pages = math.ceil(total / per_page)
-            limit_sql = "LIMIT %s OFFSET %s"
-            params_query = params + [per_page, offset]
+        filtros = []
+        params = []
+
+        if guardia_filtro:
+            filtros.append("quien_guardia = %s")
+            params.append(guardia_filtro)
+
+        where = f"WHERE {' AND '.join(filtros)}" if filtros else ""
+
+        # TOTAL
+        cur.execute(f"SELECT COUNT(*) FROM guardias {where}", params)
+        total = cur.fetchone()[0]
+
+        # DATOS
+        cur.execute(f"""
+            SELECT *
+            FROM guardias
+            {where}
+            ORDER BY fecha_registro DESC
+            LIMIT %s OFFSET %s
+        """, params + [per_page, offset])
 
     # ===============================
-    # DATOS
+    # GUARDIA NORMAL (paginación desde 11)
     # ===============================
-    cur.execute(f"""
-        SELECT *
-        FROM guardias
-        {where}
-        ORDER BY fecha_registro DESC
-        {limit_sql}
-    """, params_query)
+    else:
+        cur.execute("""
+            SELECT COUNT(*)
+            FROM guardias
+            WHERE quien_guardia = %s
+        """, (current_user.username,))
+        total = cur.fetchone()[0]
+
+        if total <= 10:
+            cur.execute("""
+                SELECT *
+                FROM guardias
+                WHERE quien_guardia = %s
+                ORDER BY fecha_registro DESC
+            """, (current_user.username,))
+        else:
+            cur.execute("""
+                SELECT *
+                FROM guardias
+                WHERE quien_guardia = %s
+                ORDER BY fecha_registro DESC
+                LIMIT %s OFFSET %s
+            """, (current_user.username, per_page, offset))
 
     guardias = cur.fetchall()
     cur.close()
+
+    # ===============================
+    # TOTAL PAGES (CLAVE DEL ARREGLO)
+    # ===============================
+    if current_user.es_admin:
+        total_pages = math.ceil(total / per_page)
+    else:
+        total_pages = math.ceil(total / per_page) if total > 10 else 1
 
     return render_template(
         "historial_guardias.html",
@@ -614,6 +621,8 @@ def historial_guardias():
         total_pages=total_pages,
         total=total
     )
+
+
 
 
 
