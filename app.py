@@ -135,10 +135,16 @@ def index():
         where.append("estado = %s")
         params.append(estado_filtro)
 
-    if resueltos_filtro == "hoy":
-        where.append("DATE(fecha_resolucion) = CURRENT_DATE")
-    elif resueltos_filtro == "semana":
-        where.append("fecha_resolucion >= CURRENT_DATE - INTERVAL '7 days'")
+        if resueltos_filtro == "hoy":
+         where.append("estado = 'Resuelto'")
+         where.append("fecha_resolucion IS NOT NULL")
+         where.append("DATE(fecha_resolucion) = CURRENT_DATE")
+
+        elif resueltos_filtro == "semana":
+         where.append("estado = 'Resuelto'")
+         where.append("fecha_resolucion IS NOT NULL")
+         where.append("fecha_resolucion >= date_trunc('week', CURRENT_DATE)")
+
 
     where_sql = "WHERE " + " AND ".join(where) if where else ""
 
