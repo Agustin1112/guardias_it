@@ -628,7 +628,7 @@ def historial_guardias():
 
 
 
-# ================== DASHBOARD ==================
+
 # ================== DASHBOARD ==================
 @app.route("/dashboard")
 @login_required
@@ -657,12 +657,11 @@ def dashboard():
     """)
     en_progreso = cur.fetchone()["count"]
 
-    # RESUELTOS HOY (estado + fecha)
+    # RESUELTOS HOY
     cur.execute("""
         SELECT COUNT(*) FROM guardias
         WHERE estado = 'Resuelto'
-        AND fecha_resolucion IS NOT NULL
-        AND DATE(fecha_resolucion) = CURRENT_DATE
+        AND DATE(fecha_registro) = CURRENT_DATE
     """)
     resueltos_hoy = cur.fetchone()["count"]
 
@@ -670,12 +669,11 @@ def dashboard():
     cur.execute("""
         SELECT COUNT(*) FROM guardias
         WHERE estado = 'Resuelto'
-        AND fecha_resolucion IS NOT NULL
-        AND fecha_resolucion >= date_trunc('week', CURRENT_DATE)
+        AND fecha_registro >= date_trunc('week', CURRENT_DATE)
     """)
     resueltos_semana = cur.fetchone()["count"]
 
-    # TOP GUARDIAS (solo resueltos)
+    # TOP GUARDIAS (resueltos)
     cur.execute("""
         SELECT quien_guardia, COUNT(*) AS total
         FROM guardias
@@ -686,14 +684,13 @@ def dashboard():
     """)
     top_guardias = cur.fetchall()
 
-    # TIEMPO PROMEDIO DE RESOLUCIÓN (minutos)
+    # TIEMPO PROMEDIO (minutos) usando fecha_registro
     cur.execute("""
         SELECT AVG(
-            EXTRACT(EPOCH FROM (fecha_resolucion - fecha_llamado)) / 60
+            EXTRACT(EPOCH FROM (fecha_registro - fecha_llamado)) / 60
         ) AS promedio
         FROM guardias
         WHERE estado = 'Resuelto'
-        AND fecha_resolucion IS NOT NULL
     """)
     tiempo_promedio = cur.fetchone()["promedio"]
 
