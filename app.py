@@ -11,6 +11,10 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 import psycopg2
 import psycopg2.extras
+import csv
+from io import StringIO
+from flask import Response
+
 
 # ================== ENV ==================
 from dotenv import load_dotenv
@@ -861,6 +865,81 @@ def resolver_guardia(id):
     cur.close()
 
     return redirect("/historial_guardias")
+
+import csv
+import io
+from flask import Response
+
+@app.route("/reporte/guardias")
+@login_required
+def reporte_guardias():
+
+    db = get_db()
+    cur = db.cursor()
+
+    guardia = request.args.get("guardia")
+
+    where = ""
+    params = []
+
+    if guardia:
+        where = "WHERE quien_guardia = %s"
+        params.append(guardia)
+
+    cur.execute(f"""
+        SELECT
+            fecha_llamado,
+            fecha_registro,
+            quien_llamo,
+            quien_guardia,
+            prioridad,
+            descripcion,
+            estado,
+            fecha_resolucion
+        FROM guardias
+        {where}
+        ORDER BY fecha_llamado DESC
+    """, params)
+
+    rows = cur.fetchall()
+
+    output = io.StringIO()
+    output.write("\ufeff")  # 🔥 CLAVE PARA EXCEL
+
+    writer = csv.writer(output)
+    writer.writerow([
+        "Fecha llamado",
+        "Fecha carga",
+        "Quién llamó",
+        "Guardia",
+        "Prioridad",
+        "Descripción",
+        "Estado",
+        "Fecha resolución"
+    ])
+
+    for r in rows:
+        writer.writerow([
+            r["fecha_llamado"],
+            r["fecha_registro"],
+            r["quien_llamo"],
+            r["quien_guardia"],
+            r["prioridad"],
+            r["descripcion"],
+            r["estado"],
+            r["fecha_resolucion"]
+        ])
+
+    cur.close()
+
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={
+            "Content-Disposition": "attachment; filename=guardias.csv"
+        }
+    )
+
 
 
 
