@@ -1,4 +1,26 @@
-database.db
+# Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+
+# Virtualenv
+.venv/
+venv/
+
+# Env files
 .env
+.env.*
+.env.testing
+.env.production
+
+# Flask
+instance/
+
+# IDEs
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

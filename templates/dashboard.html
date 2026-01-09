@@ -3,10 +3,58 @@
 
 <h3 class="mb-4">📊 Dashboard de Guardias</h3>
 
+<!-- =====================
+     FILTROS (GUARDIA + FECHAS)
+====================== -->
+<form method="get" class="row g-3 mb-4 align-items-end">
+
+    <!-- GUARDIA -->
+    <div class="col-md-3">
+        <label class="form-label">Guardia</label>
+        <select name="guardia" class="form-select">
+            <option value="">— Todos —</option>
+            {% for g in guardias_disponibles %}
+                <option value="{{ g.quien_guardia }}"
+                    {% if guardia_filtro == g.quien_guardia %}selected{% endif %}>
+                    {{ g.quien_guardia }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <!-- DESDE -->
+    <div class="col-md-2">
+        <label class="form-label">Desde</label>
+        <input type="date" name="desde" class="form-control" value="{{ fecha_desde }}">
+    </div>
+
+    <!-- HASTA -->
+    <div class="col-md-2">
+        <label class="form-label">Hasta</label>
+        <input type="date" name="hasta" class="form-control" value="{{ fecha_hasta }}">
+    </div>
+
+    <!-- APLICAR -->
+    <div class="col-md-2">
+        <button class="btn btn-primary w-100">🔍 Aplicar</button>
+    </div>
+
+    <!-- LIMPIAR -->
+    <div class="col-md-3">
+        <a href="/dashboard" class="btn btn-secondary w-100">Limpiar filtros</a>
+    </div>
+
+</form>
+
+<!-- =====================
+     TARJETAS PRINCIPALES
+====================== -->
 <div class="row g-3 mb-4">
 
+    <!-- ABIERTOS -->
     <div class="col-md-3">
-        <a href="/?estado=Abierto" class="text-decoration-none">
+        <a class="text-decoration-none"
+           href="/?estado=Abierto{% if guardia_filtro %}&guardia={{ guardia_filtro }}{% endif %}{% if fecha_desde %}&desde={{ fecha_desde }}{% endif %}{% if fecha_hasta %}&hasta={{ fecha_hasta }}{% endif %}">
             <div class="card text-bg-danger text-center shadow">
                 <div class="card-body">
                     <h6>Abiertos</h6>
@@ -16,8 +64,10 @@
         </a>
     </div>
 
+    <!-- EN PROGRESO -->
     <div class="col-md-3">
-        <a href="/?estado=En progreso" class="text-decoration-none">
+        <a class="text-decoration-none"
+           href="/?estado=En progreso{% if guardia_filtro %}&guardia={{ guardia_filtro }}{% endif %}{% if fecha_desde %}&desde={{ fecha_desde }}{% endif %}{% if fecha_hasta %}&hasta={{ fecha_hasta }}{% endif %}">
             <div class="card text-bg-warning text-center shadow">
                 <div class="card-body">
                     <h6>En progreso</h6>
@@ -27,55 +77,83 @@
         </a>
     </div>
 
+    <!-- RESUELTOS -->
     <div class="col-md-3">
-        <a href="/?resueltos=hoy" class="text-decoration-none">
+        <a class="text-decoration-none"
+           href="/?estado=Resuelto{% if guardia_filtro %}&guardia={{ guardia_filtro }}{% endif %}{% if fecha_desde %}&desde={{ fecha_desde }}{% endif %}{% if fecha_hasta %}&hasta={{ fecha_hasta }}{% endif %}">
             <div class="card text-bg-success text-center shadow">
                 <div class="card-body">
-                    <h6>Resueltos hoy</h6>
-                    <h2>{{ resueltos_hoy }}</h2>
+                    <h6>Resueltos</h6>
+                    <h2>{{ total_resueltos }}</h2>
                 </div>
             </div>
         </a>
     </div>
 
-    <div class="col-md-3">
-        <a href="/?resueltos=semana" class="text-decoration-none">
-            <div class="card text-bg-primary text-center shadow">
-                <div class="card-body">
-                    <h6>Resueltos semana</h6>
-                    <h2>{{ resueltos_semana }}</h2>
-                </div>
+    <!-- TOTAL -->
+<div class="col-md-3">
+    <a class="text-decoration-none"
+       href="/?
+       {% if guardia_filtro %}guardia={{ guardia_filtro }}{% endif %}
+       {% if fecha_desde %}&desde={{ fecha_desde }}{% endif %}
+       {% if fecha_hasta %}&hasta={{ fecha_hasta }}{% endif %}">
+        <div class="card text-bg-secondary text-center shadow">
+            <div class="card-body">
+                <h6>Total</h6>
+                <h2>{{ total }}</h2>
             </div>
-        </a>
-    </div>
+        </div>
+    </a>
+</div>
 
+
+</div>
+
+<!-- =====================
+     RATIO GENERAL
+====================== -->
+<div class="alert alert-info text-center shadow-sm mb-4">
+    🟢 <strong>Resueltos:</strong> {{ total_resueltos }}
+    &nbsp; | &nbsp;
+    🔴 <strong>Abiertos + En progreso:</strong> {{ abiertos + en_progreso }}
 </div>
 
 <hr class="my-4">
 
-<h5>🏆 Top Guardias</h5>
-<table class="table table-striped">
-  <thead class="table-dark">
-    <tr>
-      <th>Guardia</th>
-      <th>Total llamados</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for g in top_guardias %}
-    <tr>
-      <td>{{ g.quien_guardia }}</td>
-      <td>{{ g.total }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
+<!-- =====================
+     TOP GUARDIAS
+====================== -->
+<h5>🏆 Top Guardias (resueltos)</h5>
+<table class="table table-striped shadow-sm">
+    <thead class="table-dark">
+        <tr>
+            <th>Guardia</th>
+            <th>Total llamados</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for g in top_guardias %}
+        <tr>
+            <td>{{ g.quien_guardia }}</td>
+            <td>{{ g.total }}</td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="2" class="text-center text-muted">Sin datos</td>
+        </tr>
+        {% endfor %}
+    </tbody>
 </table>
 
 <hr class="my-4">
 
-<div class="alert alert-info">
-  ⏱️ <strong>Tiempo promedio de resolución:</strong>
-  {{ tiempo_promedio }} minutos
+
+<!-- =====================
+     TIEMPO PROMEDIO GLOBAL
+====================== -->
+<div class="alert alert-secondary text-center shadow-sm">
+    ⏱️ <strong>Tiempo promedio global de resolución:</strong>
+    {{ tiempo_promedio }} minutos
 </div>
 
 {% endblock %}

@@ -12,12 +12,33 @@ from werkzeug.security import check_password_hash, generate_password_hash
 import psycopg2
 import psycopg2.extras
 
+# ================== ENV ==================
+from dotenv import load_dotenv
+load_dotenv()
+
+
+
+ENV = os.environ.get("FLASK_ENV", "production")
+
+if ENV == "testing":
+    load_dotenv(".env.testing")
+else:
+    load_dotenv(".env")
+
+print("🚀 Entorno:", ENV)
+print("📦 DATABASE_URL:", os.environ.get("DATABASE_URL"))
 # ================== CONFIG ==================
 app = Flask(__name__)
-app.secret_key = "super_secreto_guardias"
+
+app.secret_key = os.environ.get("SECRET_KEY", "super_secreto_guardias")
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
+FLASK_ENV = os.environ.get("FLASK_ENV", "production")
+
 ITEMS_PER_PAGE = 10
+
+app.config["ENV"] = FLASK_ENV
+app.config["DEBUG"] = FLASK_ENV == "testing"
 
 # ================== LOGIN ==================
 login_manager = LoginManager()
@@ -26,10 +47,14 @@ login_manager.login_view = "login"
 
 # ================== DB ==================
 def get_db():
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL no está configurada")
+
     return psycopg2.connect(
         DATABASE_URL,
         cursor_factory=psycopg2.extras.RealDictCursor
     )
+
 
 # ================== USUARIOS ==================
 class User(UserMixin):
@@ -118,11 +143,15 @@ def index():
     guardia_filtro = request.args.get("guardia")
     estado_filtro = request.args.get("estado")
     resueltos_filtro = request.args.get("resueltos")
+    from_dashboard = request.args.get("from_dashboard")  # 👈 NUEVO
     page = int(request.args.get("page", 1))
 
     where = []
     params = []
 
+    # =========================
+    # PERMISOS
+    # =========================
     if not current_user.es_admin:
         where.append("quien_guardia = %s")
         params.append(current_user.username)
@@ -131,21 +160,33 @@ def index():
         where.append("quien_guardia = %s")
         params.append(guardia_filtro)
 
-    if estado_filtro:
+    # =========================
+    # FILTRO POR ESTADO
+    # =========================
+    if estado_filtro == "Resuelto":
+        where.append("estado = 'Resuelto'")
+        where.append("fecha_resolucion IS NOT NULL")
+
+    elif estado_filtro:
         where.append("estado = %s")
         params.append(estado_filtro)
 
-        if resueltos_filtro == "hoy":
-         where.append("estado = 'Resuelto'")
-         where.append("fecha_resolucion IS NOT NULL")
-         where.append("DATE(fecha_resolucion) = CURRENT_DATE")
+    # =========================
+    # FILTRO DESDE DASHBOARD
+    # =========================
+    if resueltos_filtro == "hoy":
+        where.append("estado = 'Resuelto'")
+        where.append("fecha_resolucion IS NOT NULL")
+        where.append("DATE(fecha_resolucion) = CURRENT_DATE")
 
-        elif resueltos_filtro == "semana":
-         where.append("estado = 'Resuelto'")
-         where.append("fecha_resolucion IS NOT NULL")
-         where.append("fecha_resolucion >= date_trunc('week', CURRENT_DATE)")
+    elif resueltos_filtro == "semana":
+        where.append("estado = 'Resuelto'")
+        where.append("fecha_resolucion IS NOT NULL")
+        where.append("fecha_resolucion >= date_trunc('week', CURRENT_DATE)")
 
-
+    # =========================
+    # QUERY FINAL
+    # =========================
     where_sql = "WHERE " + " AND ".join(where) if where else ""
 
     query = f"""
@@ -164,17 +205,26 @@ def index():
     cur.execute(query, params)
     guardias_all = cur.fetchall()
 
+    # =========================
+    # PAGINACIÓN
+    # =========================
     total = len(guardias_all)
     total_pages = (total + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
     start = (page - 1) * ITEMS_PER_PAGE
     end = start + ITEMS_PER_PAGE
     guardias_pag = guardias_all[start:end]
 
+    # =========================
+    # MARCAR RECIENTES
+    # =========================
     now = datetime.now()
     for g in guardias_pag:
         fecha_registro = g["fecha_registro"]
         g["recent"] = fecha_registro and fecha_registro > now - timedelta(minutes=10)
 
+    # =========================
+    # GUARDIAS DISPONIBLES
+    # =========================
     guardias_disponibles = []
     if current_user.es_admin:
         cur.execute("""
@@ -184,16 +234,22 @@ def index():
         """)
         guardias_disponibles = cur.fetchall()
 
-    db.close()
+    cur.close()
 
     return render_template(
         "index.html",
         guardias=guardias_pag,
         guardias_disponibles=guardias_disponibles,
         guardia_filtro=guardia_filtro,
+        estado_filtro=estado_filtro,
+        resueltos_filtro=resueltos_filtro,
+        from_dashboard=from_dashboard,  # 👈 PASARLO AL TEMPLATE
         page=page,
         total_pages=total_pages
     )
+
+
+
 
 # ---------- PANEL DE USUARIOS (SOLO ADMIN) ----------
 @app.route("/usuarios")
@@ -466,13 +522,27 @@ def nueva_guardia():
             "%Y-%m-%dT%H:%M"
         )
 
+        estado = request.form["estado"]
+
+        # 🔥 CLAVE: setear fecha_resolucion si es Resuelto
+        fecha_resolucion = None
+        if estado == "Resuelto":
+            fecha_resolucion = datetime.now()
+
         cur.execute("""
             INSERT INTO guardias (
-                quien_llamo, fecha_llamado, quien_guardia,
-                descripcion, prioridad, fecha_registro,
-                derivado, derivado_a, estado
+                quien_llamo,
+                fecha_llamado,
+                quien_guardia,
+                descripcion,
+                prioridad,
+                fecha_registro,
+                fecha_resolucion,
+                derivado,
+                derivado_a,
+                estado
             )
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """, (
             request.form["quien_llamo"],
             fecha_llamado,
@@ -480,9 +550,10 @@ def nueva_guardia():
             request.form["descripcion"],
             request.form["prioridad"],
             datetime.now(),
+            fecha_resolucion,          # 👈 ACA
             bool(request.form.get("derivado")),
             request.form.get("derivado_a"),
-            request.form["estado"]
+            estado
         ))
 
         db.commit()
@@ -490,6 +561,7 @@ def nueva_guardia():
         return redirect("/")
 
     return render_template("nueva_guardia.html")
+
 
 @app.route("/guardias/editar/<int:guardia_id>", methods=["GET", "POST"])
 @login_required
@@ -636,6 +708,7 @@ def historial_guardias():
 
 
 # ================== DASHBOARD ==================
+# ================== DASHBOARD ==================
 @app.route("/dashboard")
 @login_required
 def dashboard():
@@ -645,60 +718,96 @@ def dashboard():
     db = get_db()
     cur = db.cursor()
 
-    # TOTAL LLAMADOS
-    cur.execute("SELECT COUNT(*) FROM guardias")
+    guardia_filtro = request.args.get("guardia")
+
+    # ======================
+    # BASE DE FILTROS
+    # ======================
+    where = []
+    params = []
+
+    if guardia_filtro:
+        where.append("quien_guardia = %s")
+        params.append(guardia_filtro)
+
+    where_sql = "WHERE " + " AND ".join(where) if where else ""
+
+    # ======================
+    # TOTAL GENERAL
+    # ======================
+    cur.execute(f"""
+        SELECT COUNT(*) FROM guardias
+        {where_sql}
+    """, params)
     total = cur.fetchone()["count"]
 
+    # ======================
     # ABIERTOS
-    cur.execute("""
+    # ======================
+    cur.execute(f"""
         SELECT COUNT(*) FROM guardias
-        WHERE estado = 'Abierto'
-    """)
+        {where_sql} {"AND" if where_sql else "WHERE"} estado = 'Abierto'
+    """, params)
     abiertos = cur.fetchone()["count"]
 
+    # ======================
     # EN PROGRESO
-    cur.execute("""
+    # ======================
+    cur.execute(f"""
         SELECT COUNT(*) FROM guardias
-        WHERE estado = 'En progreso'
-    """)
+        {where_sql} {"AND" if where_sql else "WHERE"} estado = 'En progreso'
+    """, params)
     en_progreso = cur.fetchone()["count"]
 
-    # RESUELTOS HOY
-    cur.execute("""
+    # ======================
+    # RESUELTOS
+    # ======================
+    cur.execute(f"""
         SELECT COUNT(*) FROM guardias
-        WHERE estado = 'Resuelto'
-        AND DATE(fecha_registro) = CURRENT_DATE
-    """)
-    resueltos_hoy = cur.fetchone()["count"]
+        {where_sql} {"AND" if where_sql else "WHERE"}
+        estado = 'Resuelto'
+        AND fecha_resolucion IS NOT NULL
+    """, params)
+    total_resueltos = cur.fetchone()["count"]
 
-    # RESUELTOS ESTA SEMANA
-    cur.execute("""
-        SELECT COUNT(*) FROM guardias
-        WHERE estado = 'Resuelto'
-        AND fecha_registro >= date_trunc('week', CURRENT_DATE)
-    """)
-    resueltos_semana = cur.fetchone()["count"]
+    # ======================
+    # TOP GUARDIAS (solo sin filtro)
+    # ======================
+    top_guardias = []
+    if not guardia_filtro:
+        cur.execute("""
+            SELECT quien_guardia, COUNT(*) AS total
+            FROM guardias
+            WHERE estado = 'Resuelto'
+            GROUP BY quien_guardia
+            ORDER BY total DESC
+            LIMIT 5
+        """)
+        top_guardias = cur.fetchall()
 
-    # TOP GUARDIAS (resueltos)
-    cur.execute("""
-        SELECT quien_guardia, COUNT(*) AS total
-        FROM guardias
-        WHERE estado = 'Resuelto'
-        GROUP BY quien_guardia
-        ORDER BY total DESC
-        LIMIT 5
-    """)
-    top_guardias = cur.fetchall()
-
-    # TIEMPO PROMEDIO (minutos) usando fecha_registro
-    cur.execute("""
+    # ======================
+    # TIEMPO PROMEDIO GLOBAL
+    # ======================
+    cur.execute(f"""
         SELECT AVG(
-            EXTRACT(EPOCH FROM (fecha_registro - fecha_llamado)) / 60
+            EXTRACT(EPOCH FROM (fecha_resolucion - fecha_llamado)) / 60
         ) AS promedio
         FROM guardias
-        WHERE estado = 'Resuelto'
-    """)
+        {where_sql} {"AND" if where_sql else "WHERE"}
+        estado = 'Resuelto'
+        AND fecha_resolucion IS NOT NULL
+    """, params)
     tiempo_promedio = cur.fetchone()["promedio"]
+
+    # ======================
+    # GUARDIAS DISPONIBLES
+    # ======================
+    cur.execute("""
+        SELECT DISTINCT quien_guardia
+        FROM guardias
+        ORDER BY quien_guardia
+    """)
+    guardias_disponibles = cur.fetchall()
 
     cur.close()
 
@@ -707,11 +816,15 @@ def dashboard():
         total=total,
         abiertos=abiertos,
         en_progreso=en_progreso,
-        resueltos_hoy=resueltos_hoy,
-        resueltos_semana=resueltos_semana,
+        total_resueltos=total_resueltos,
         top_guardias=top_guardias,
-        tiempo_promedio=round(tiempo_promedio, 1) if tiempo_promedio else "—"
+        tiempo_promedio=round(tiempo_promedio, 1) if tiempo_promedio else "—",
+        guardias_disponibles=guardias_disponibles,
+        guardia_filtro=guardia_filtro
     )
+
+
+
 
 
 @app.route("/resolver_guardia/<int:id>", methods=["POST"])
