@@ -95,35 +95,58 @@
 
 <body>
 
-    <form method="POST" class="login-card">
+<form method="POST" class="login-card">
 
-        <div class="text-center mb-4">
-            <!-- LOGO EMPRESA -->
-            <img src="{{ url_for('static', filename='img/logo_ues.jpg') }}"
-     alt="Logo empresa"
-     class="logo mb-3">
+    <!-- 🔴 MENSAJES DE ERROR -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} text-center mb-3">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
 
+    <div class="text-center mb-4">
+        <!-- LOGO EMPRESA -->
+        <img
+            src="{{ url_for('static', filename='img/logo_ues.jpg') }}"
+            alt="Logo empresa"
+            class="logo mb-3"
+        >
 
-            <h4 class="login-title mb-1">Guardias IT</h4>
-            <div class="login-subtitle">
-                Acceso al sistema
-            </div>
+        <h4 class="login-title mb-1">Guardias IT</h4>
+        <div class="login-subtitle">
+            Acceso al sistema
         </div>
+    </div>
 
-        <div class="mb-3">
-            <input class="form-control" name="username" placeholder="Usuario" required>
-        </div>
+    <div class="mb-3">
+        <input
+            class="form-control"
+            name="username"
+            placeholder="Usuario"
+            required
+        >
+    </div>
 
-        <div class="mb-4">
-            <input class="form-control" type="password" name="password" placeholder="Contraseña" required>
-        </div>
+    <div class="mb-4">
+        <input
+            class="form-control"
+            type="password"
+            name="password"
+            placeholder="Contraseña"
+            required
+        >
+    </div>
 
-        <button class="btn btn-login w-100 py-2">
-            <i class="fa-solid fa-right-to-bracket me-1"></i>
-            Ingresar
-        </button>
+    <button class="btn btn-login w-100 py-2">
+        <i class="fa-solid fa-right-to-bracket me-1"></i>
+        Ingresar
+    </button>
 
-    </form>
+</form>
 
 </body>
 </html>

@@ -93,6 +93,9 @@ from flask import render_template, request, redirect, flash
 from flask_login import login_user, logout_user, login_required
 from werkzeug.security import check_password_hash
 
+from flask import render_template, request, redirect, flash
+from flask_login import login_user
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -105,7 +108,8 @@ def login():
         cur.execute("""
             SELECT id, username, password_hash, es_admin
             FROM usuarios
-            WHERE username = %s AND activo = true
+            WHERE username = %s
+            AND activo = true
         """, (username,))
 
         user = cur.fetchone()
@@ -123,9 +127,11 @@ def login():
             )
             return redirect("/")
 
+        # ❌ Credenciales inválidas
         flash("Usuario o contraseña incorrectos", "danger")
 
     return render_template("login.html")
+
 
 
 
@@ -291,12 +297,6 @@ def index():
         page=page,
         total_pages=total_pages
     )
-
-
-
-
-
-
 
 # ---------- PANEL DE USUARIOS (SOLO ADMIN) ----------
 @app.route("/usuarios")
