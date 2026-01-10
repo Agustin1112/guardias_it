@@ -618,6 +618,7 @@ def editar_guardia(guardia_id):
 
     if request.method == "POST":
         estado = request.form.get("estado")
+        descripcion = request.form.get("descripcion")
         resolucion = request.form.get("resolucion")
         derivado = "derivado" in request.form
         derivado_a = request.form.get("derivado_a")
@@ -625,12 +626,14 @@ def editar_guardia(guardia_id):
         cur.execute("""
             UPDATE guardias
             SET estado = %s,
+                descripcion = %s,
                 resolucion = %s,
                 derivado = %s,
                 derivado_a = %s
             WHERE id = %s
         """, (
             estado,
+            descripcion,
             resolucion,
             derivado,
             derivado_a,
@@ -639,7 +642,7 @@ def editar_guardia(guardia_id):
 
         db.commit()
         cur.close()
-        flash("Llamado actualizado", "success")
+        flash("Llamado actualizado correctamente", "success")
         return redirect(url_for("index"))
 
     cur.execute("SELECT * FROM guardias WHERE id = %s", (guardia_id,))
@@ -647,6 +650,7 @@ def editar_guardia(guardia_id):
     cur.close()
 
     return render_template("editar_guardia.html", guardia=guardia)
+
 
 @app.route("/historial_guardias")
 @login_required
