@@ -138,6 +138,11 @@ def logout():
 
 
 # ================== INDEX ==================
+import re
+from datetime import datetime, timedelta
+from flask import request, render_template
+from flask_login import login_required, current_user
+
 @app.route("/")
 @login_required
 def index():
@@ -147,7 +152,8 @@ def index():
     guardia_filtro = request.args.get("guardia")
     estado_filtro = request.args.get("estado")
     resueltos_filtro = request.args.get("resueltos")
-    from_dashboard = request.args.get("from_dashboard")  # 👈 NUEVO
+    from_dashboard = request.args.get("from_dashboard")
+    q = request.args.get("q")
     page = int(request.args.get("page", 1))
 
     where = []
@@ -170,7 +176,6 @@ def index():
     if estado_filtro == "Resuelto":
         where.append("estado = 'Resuelto'")
         where.append("fecha_resolucion IS NOT NULL")
-
     elif estado_filtro:
         where.append("estado = %s")
         params.append(estado_filtro)
@@ -189,8 +194,21 @@ def index():
         where.append("fecha_resolucion >= date_trunc('week', CURRENT_DATE)")
 
     # =========================
-    # QUERY FINAL
+    # 🔍 BÚSQUEDA FLEXIBLE
     # =========================
+    if q:
+        q_norm = re.sub(r"[\s\-]+", "", q.lower())
+        like = f"%{q_norm}%"
+
+        where.append("""
+            (
+                LOWER(REPLACE(REPLACE(descripcion, ' ', ''), '-', '')) LIKE %s
+                OR LOWER(REPLACE(REPLACE(quien_llamo, ' ', ''), '-', '')) LIKE %s
+                OR LOWER(REPLACE(REPLACE(COALESCE(derivado_a,''), ' ', ''), '-', '')) LIKE %s
+            )
+        """)
+        params.extend([like, like, like])
+
     where_sql = "WHERE " + " AND ".join(where) if where else ""
 
     query = f"""
@@ -212,6 +230,7 @@ def index():
     # =========================
     # PAGINACIÓN
     # =========================
+    ITEMS_PER_PAGE = 10
     total = len(guardias_all)
     total_pages = (total + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
     start = (page - 1) * ITEMS_PER_PAGE
@@ -219,12 +238,32 @@ def index():
     guardias_pag = guardias_all[start:end]
 
     # =========================
-    # MARCAR RECIENTES
+    # RECIENTES + RESALTADO
     # =========================
     now = datetime.now()
-    for g in guardias_pag:
-        fecha_registro = g["fecha_registro"]
-        g["recent"] = fecha_registro and fecha_registro > now - timedelta(minutes=10)
+
+    if q:
+        pattern = re.compile(
+            r"(" + r"[\s\-]*".join(map(re.escape, q_norm)) + r")",
+            re.IGNORECASE
+        )
+
+        def highlight(text):
+            if not text:
+                return text
+            return pattern.sub(r"<mark>\1</mark>", text)
+
+        for g in guardias_pag:
+            g["recent"] = g["fecha_registro"] and g["fecha_registro"] > now - timedelta(minutes=10)
+            g["descripcion_html"] = highlight(g["descripcion"])
+            g["quien_llamo_html"] = highlight(g["quien_llamo"])
+            g["derivado_a_html"] = highlight(g["derivado_a"]) if g["derivado_a"] else None
+    else:
+        for g in guardias_pag:
+            g["recent"] = g["fecha_registro"] and g["fecha_registro"] > now - timedelta(minutes=10)
+            g["descripcion_html"] = g["descripcion"]
+            g["quien_llamo_html"] = g["quien_llamo"]
+            g["derivado_a_html"] = g["derivado_a"]
 
     # =========================
     # GUARDIAS DISPONIBLES
@@ -247,10 +286,14 @@ def index():
         guardia_filtro=guardia_filtro,
         estado_filtro=estado_filtro,
         resueltos_filtro=resueltos_filtro,
-        from_dashboard=from_dashboard,  # 👈 PASARLO AL TEMPLATE
+        from_dashboard=from_dashboard,
+        q=q,
         page=page,
         total_pages=total_pages
     )
+
+
+
 
 
 
